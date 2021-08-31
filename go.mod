@@ -1,4 +1,4 @@
-module go.einride.tech/protoc-gen-go-dataloader
+module go.einride.tech/protoc-gen-go-aip-dataloader
 
 go 1.16
 

@@ -3,8 +3,8 @@ before:
     - go mod download
 
 builds:
-  - id: protoc-gen-go-dataloader
-    binary: protoc-gen-go-dataloader
+  - id: protoc-gen-go-aip-dataloader
+    binary: protoc-gen-go-aip-dataloader
     main: ./main.go
     env:
       - CGO_ENABLED=0
