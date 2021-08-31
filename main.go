@@ -44,7 +44,7 @@ func main() {
 	})
 }
 
-const generatedFilenameSuffix = ".dataloader.go"
+const generatedFilenameSuffix = "_dataloader.go"
 
 func genType(g *protogen.GeneratedFile, d *Dataloader) {
 	timeDuration := g.QualifiedGoIdent(protogen.GoIdent{
