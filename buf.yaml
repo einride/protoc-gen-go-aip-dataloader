@@ -1,0 +1,6 @@
+version: v1
+
+name: buf.build/einride/protoc-gen-go-dataloader
+
+deps:
+  - buf.build/googleapis/googleapis
