@@ -26,8 +26,8 @@ build/protoc-gen-go-grpc: $(abspath $(lastword $(MAKEFILE_LIST)))
 	$(info [$@] building binary...)
 	@GOBIN=$(abspath $(dir $@)) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0
 
-.PHONY: build/protoc-gen-go-dataloader
-build/protoc-gen-go-dataloader:
+.PHONY: build/protoc-gen-go-aip-dataloader
+build/protoc-gen-go-aip-dataloader:
 	$(info [$@] building binary...)
 	@go build -o $@ .
 
@@ -45,7 +45,7 @@ go-test:
 example_plugins := \
 	build/protoc-gen-go \
 	build/protoc-gen-go-grpc \
-	build/protoc-gen-go-dataloader \
+	build/protoc-gen-go-aip-dataloader \
 
 .PHONY: buf-generate-example
 buf-generate-example: $(buf) $(example_plugins)

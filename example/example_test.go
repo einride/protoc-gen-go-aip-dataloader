@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	freightv1 "go.einride.tech/protoc-gen-go-dataloader/example/internal/proto/gen/einride/example/freight/v1"
+	freightv1 "go.einride.tech/protoc-gen-go-aip-dataloader/example/internal/proto/gen/einride/example/freight/v1"
 	"google.golang.org/grpc"
 )
 
