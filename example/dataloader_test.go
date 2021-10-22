@@ -55,6 +55,50 @@ func TestDataloader(t *testing.T) {
 			assert.DeepEqual(t, expectedRequest, client.recvRequests[0], protocmp.Transform())
 		})
 
+		t.Run("Multi parent", func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			site1 := &freightv1.Site{Name: "shippers/1/sites/1"}
+			site2 := &freightv1.Site{Name: "shippers/2/sites/1"}
+			client := &mockSiteService{
+				sites: []*freightv1.Site{
+					site1, site2,
+				},
+			}
+			dl := NewSitesDataloader(
+				ctx,
+				client,
+				time.Millisecond*100,
+				100,
+			)
+			gotSite1, err := dl.Load("shippers/1", site1.Name)
+			assert.NilError(t, err)
+			gotSite2, err := dl.Load("shippers/2", site2.Name)
+			assert.NilError(t, err)
+
+			// should receive correct site
+			assert.DeepEqual(t, site1, gotSite1, protocmp.Transform())
+			assert.DeepEqual(t, site2, gotSite2, protocmp.Transform())
+			// should be two requests
+			assert.Equal(t, 2, len(client.recvRequests))
+			// should be correct request
+			expectedRequest := []*freightv1.BatchGetSitesRequest{
+				{
+					Parent: "shippers/1",
+					Names: []string{
+						site1.Name,
+					},
+				},
+				{
+					Parent: "shippers/2",
+					Names: []string{
+						site2.Name,
+					},
+				},
+			}
+			assert.DeepEqual(t, expectedRequest, client.recvRequests, protocmp.Transform())
+		})
+
 		t.Run("MissingKey", func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
@@ -317,6 +361,73 @@ func TestDataloader(t *testing.T) {
 				},
 			}
 			assert.DeepEqual(t, expectedRequest, client.recvRequests[0], protocmp.Transform())
+		})
+		t.Run("Multiparent Concurrently", func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			site1 := &freightv1.Site{Name: "shippers/1/sites/1"}
+			site2 := &freightv1.Site{Name: "shippers/1/sites/2"}
+			client := &mockSiteService{
+				sites: []*freightv1.Site{
+					site1, site2,
+				},
+			}
+			dl := NewSitesDataloader(
+				ctx,
+				client,
+				time.Millisecond*100,
+				100,
+			)
+
+			// load the same key twice
+			var gotSite1 *freightv1.Site
+			var gotSite2 *freightv1.Site
+			var g errgroup.Group
+			g.Go(func() error {
+				site, err := dl.Load("shippers/1", site1.Name)
+				if err != nil {
+					return err
+				}
+				gotSite1 = site
+				return nil
+			})
+			g.Go(func() error {
+				site, err := dl.Load("shippers/2", site2.Name)
+				if err != nil {
+					return err
+				}
+				gotSite2 = site
+				return nil
+			})
+			assert.NilError(t, g.Wait())
+
+			// should receive correct sites
+			assert.DeepEqual(t, site1, gotSite1, protocmp.Transform())
+			assert.DeepEqual(t, site2, gotSite2, protocmp.Transform())
+			// should only be one request
+			assert.Equal(t, 2, len(client.recvRequests))
+			// should be correct request
+			expectedRequest := []*freightv1.BatchGetSitesRequest{
+				{
+					Parent: "shippers/1",
+					Names: []string{
+						site1.Name,
+					},
+				},
+				{
+					Parent: "shippers/2",
+					Names: []string{
+						site2.Name,
+					},
+				},
+			}
+			assert.DeepEqual(
+				t,
+				expectedRequest,
+				client.recvRequests,
+				protocmp.Transform(),
+				cmpopts.SortSlices(batchGetSitesRequestsLessFunc),
+			)
 		})
 
 		t.Run("AboveTimeoutLimitConcurrently", func(t *testing.T) {

@@ -18,7 +18,7 @@ type SitesDataloader struct {
 	maxBatch int
 	mu       sync.Mutex // protects mutable state below
 	cache    map[string]*freightv1.Site
-	batch    *sitesDataloaderBatch
+	batches  map[string]*sitesDataloaderBatch
 }
 
 type sitesDataloaderBatch struct {
@@ -82,10 +82,14 @@ func (l *SitesDataloader) LoadThunk(parent string, name string) func() (*freight
 			return it, nil
 		}
 	}
-	if l.batch == nil {
-		l.batch = &sitesDataloaderBatch{parent: parent, done: make(chan struct{})}
+	if l.batches == nil {
+		l.batches = make(map[string]*sitesDataloaderBatch)
 	}
-	batch := l.batch
+	batch, ok := l.batches[parent]
+	if !ok {
+		batch = &sitesDataloaderBatch{parent: parent, done: make(chan struct{})}
+		l.batches[parent] = batch
+	}
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 	return func() (*freightv1.Site, error) {
@@ -195,7 +199,7 @@ func (b *sitesDataloaderBatch) keyIndex(l *SitesDataloader, key string) int {
 	if l.maxBatch != 0 && pos >= l.maxBatch-1 {
 		if !b.closing {
 			b.closing = true
-			l.batch = nil
+			delete(l.batches, b.parent)
 			go b.end(l)
 		}
 	}
@@ -210,7 +214,7 @@ func (b *sitesDataloaderBatch) startTimer(l *SitesDataloader) {
 		l.mu.Unlock()
 		return
 	}
-	l.batch = nil
+	delete(l.batches, b.parent)
 	l.mu.Unlock()
 	b.end(l)
 }
