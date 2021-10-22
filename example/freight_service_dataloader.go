@@ -1,13 +1,13 @@
 package example
 
 import (
-	context "context"
-	fmt "fmt"
-	sync "sync"
-	time "time"
+	"context"
+	"fmt"
+	"sync"
+	"time"
 
 	freightv1 "go.einride.tech/protoc-gen-go-aip-dataloader/example/internal/proto/gen/einride/example/freight/v1"
-	proto "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // SitesDataloader is a dataloader for einride.example.freight.v1.FreightService.BatchGetSites.
@@ -22,6 +22,7 @@ type SitesDataloader struct {
 }
 
 type sitesDataloaderBatch struct {
+	parent  string
 	keys    []string
 	data    []*freightv1.Site
 	err     error
@@ -44,9 +45,10 @@ func NewSitesDataloader(
 	}
 }
 
-func (l *SitesDataloader) fetch(keys []string) ([]*freightv1.Site, error) {
+func (l *SitesDataloader) fetch(parent string, keys []string) ([]*freightv1.Site, error) {
 	var request freightv1.BatchGetSitesRequest
 	// request := proto.Clone(l.requestTemplate).(*freightv1.BatchGetSitesRequest)
+	request.Parent = parent
 	request.Names = keys
 	response, err := l.client.BatchGetSites(l.ctx, &request)
 	if err != nil {
@@ -81,7 +83,7 @@ func (l *SitesDataloader) LoadThunk(parent string, name string) func() (*freight
 		}
 	}
 	if l.batch == nil {
-		l.batch = &sitesDataloaderBatch{done: make(chan struct{})}
+		l.batch = &sitesDataloaderBatch{parent: parent, done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -214,6 +216,6 @@ func (b *sitesDataloaderBatch) startTimer(l *SitesDataloader) {
 }
 
 func (b *sitesDataloaderBatch) end(l *SitesDataloader) {
-	b.data, b.err = l.fetch(b.keys)
+	b.data, b.err = l.fetch(b.parent, b.keys)
 	close(b.done)
 }
