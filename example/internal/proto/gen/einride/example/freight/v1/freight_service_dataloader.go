@@ -12,17 +12,17 @@ import (
 
 // SitesDataloader is a dataloader for einride.example.freight.v1.FreightService.BatchGetSites.
 type SitesDataloader struct {
-	ctx             context.Context
-	client          FreightServiceClient
-	requestTemplate *BatchGetSitesRequest
-	wait            time.Duration
-	maxBatch        int
-	mu              sync.Mutex // protects mutable state below
-	cache           map[string]*Site
-	batch           *sitesDataloaderBatch
+	ctx      context.Context
+	client   FreightServiceClient
+	wait     time.Duration
+	maxBatch int
+	mu       sync.Mutex // protects mutable state below
+	cache    map[string]*Site
+	batches  map[string]*sitesDataloaderBatch
 }
 
 type sitesDataloaderBatch struct {
+	parent  string
 	keys    []string
 	data    []*Site
 	err     error
@@ -34,23 +34,23 @@ type sitesDataloaderBatch struct {
 func NewSitesDataloader(
 	ctx context.Context,
 	client FreightServiceClient,
-	requestTemplate *BatchGetSitesRequest,
 	wait time.Duration,
 	maxBatch int,
 ) *SitesDataloader {
 	return &SitesDataloader{
-		ctx:             ctx,
-		client:          client,
-		requestTemplate: requestTemplate,
-		wait:            wait,
-		maxBatch:        maxBatch,
+		ctx:      ctx,
+		client:   client,
+		wait:     wait,
+		maxBatch: maxBatch,
+		batches:  make(map[string]*sitesDataloaderBatch),
 	}
 }
 
-func (l *SitesDataloader) fetch(keys []string) ([]*Site, error) {
-	request := proto.Clone(l.requestTemplate).(*BatchGetSitesRequest)
-	request.Names = keys
-	response, err := l.client.BatchGetSites(l.ctx, request)
+func (l *SitesDataloader) fetch(parent string, names []string) ([]*Site, error) {
+	var request BatchGetSitesRequest
+	request.Parent = parent
+	request.Names = names
+	response, err := l.client.BatchGetSites(l.ctx, &request)
 	if err != nil {
 		return nil, err
 	}
@@ -58,34 +58,35 @@ func (l *SitesDataloader) fetch(keys []string) ([]*Site, error) {
 }
 
 // Load a result by key, batching and caching will be applied automatically
-func (l *SitesDataloader) Load(key string) (*Site, error) {
+func (l *SitesDataloader) Load(parent string, name string) (*Site, error) {
 	if l == nil {
 		return nil, fmt.Errorf("SitesDataloader is nil")
 	}
-	return l.LoadThunk(key)()
+	return l.LoadThunk(parent, name)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a result.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *SitesDataloader) LoadThunk(key string) func() (*Site, error) {
+func (l *SitesDataloader) LoadThunk(parent string, name string) func() (*Site, error) {
 	if l == nil {
 		return func() (*Site, error) {
 			return nil, fmt.Errorf("SitesDataloader is nil")
 		}
 	}
 	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
+	if it, ok := l.cache[name]; ok {
 		l.mu.Unlock()
 		return func() (*Site, error) {
 			return it, nil
 		}
 	}
-	if l.batch == nil {
-		l.batch = &sitesDataloaderBatch{done: make(chan struct{})}
+	batch, ok := l.batches[parent]
+	if !ok {
+		batch = &sitesDataloaderBatch{parent: parent, done: make(chan struct{})}
+		l.batches[parent] = batch
 	}
-	batch := l.batch
-	pos := batch.keyIndex(l, key)
+	pos := batch.keyIndex(l, name)
 	l.mu.Unlock()
 	return func() (*Site, error) {
 		<-batch.done
@@ -95,7 +96,7 @@ func (l *SitesDataloader) LoadThunk(key string) func() (*Site, error) {
 		}
 		if batch.err == nil {
 			l.mu.Lock()
-			l.unsafeSet(key, data)
+			l.unsafeSet(name, data)
 			l.mu.Unlock()
 		}
 		return data, batch.err
@@ -104,12 +105,12 @@ func (l *SitesDataloader) LoadThunk(key string) func() (*Site, error) {
 
 // LoadAll fetches many keys at once.
 // It will be broken into appropirately sized sub-batches based on how the dataloader is configured.
-func (l *SitesDataloader) LoadAll(keys []string) ([]*Site, error) {
-	results := make([]func() (*Site, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
+func (l *SitesDataloader) LoadAll(parent string, names []string) ([]*Site, error) {
+	results := make([]func() (*Site, error), len(names))
+	for i, name := range names {
+		results[i] = l.LoadThunk(parent, name)
 	}
-	values := make([]*Site, len(keys))
+	values := make([]*Site, len(names))
 	var err error
 	for i, thunk := range results {
 		values[i], err = thunk()
@@ -123,13 +124,13 @@ func (l *SitesDataloader) LoadAll(keys []string) ([]*Site, error) {
 // LoadAllThunk returns a function that when called will block waiting for results.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *SitesDataloader) LoadAllThunk(keys []string) func() ([]*Site, error) {
-	results := make([]func() (*Site, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
+func (l *SitesDataloader) LoadAllThunk(parent string, names []string) func() ([]*Site, error) {
+	results := make([]func() (*Site, error), len(names))
+	for i, name := range names {
+		results[i] = l.LoadThunk(parent, name)
 	}
 	return func() ([]*Site, error) {
-		values := make([]*Site, len(keys))
+		values := make([]*Site, len(names))
 		var err error
 		for i, thunk := range results {
 			values[i], err = thunk()
@@ -192,7 +193,7 @@ func (b *sitesDataloaderBatch) keyIndex(l *SitesDataloader, key string) int {
 	if l.maxBatch != 0 && pos >= l.maxBatch-1 {
 		if !b.closing {
 			b.closing = true
-			l.batch = nil
+			delete(l.batches, b.parent)
 			go b.end(l)
 		}
 	}
@@ -207,12 +208,12 @@ func (b *sitesDataloaderBatch) startTimer(l *SitesDataloader) {
 		l.mu.Unlock()
 		return
 	}
-	l.batch = nil
+	delete(l.batches, b.parent)
 	l.mu.Unlock()
 	b.end(l)
 }
 
 func (b *sitesDataloaderBatch) end(l *SitesDataloader) {
-	b.data, b.err = l.fetch(b.keys)
+	b.data, b.err = l.fetch(b.parent, b.keys)
 	close(b.done)
 }

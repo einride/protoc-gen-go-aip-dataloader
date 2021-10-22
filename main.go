@@ -63,18 +63,18 @@ func genType(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("type ", d.Name(), " struct {")
 	g.P("ctx ", contextContext)
 	g.P("client ", d.ClientName())
-	g.P("requestTemplate *", d.Method.Input.GoIdent)
 	g.P("wait ", timeDuration)
 	g.P("maxBatch int")
 	g.P("mu ", syncMutex, " // protects mutable state below")
 	g.P("cache map[string]", d.OutputType())
-	g.P("batch *", d.BatchName())
+	g.P("batches map[string]*", d.BatchName())
 	g.P("}")
 }
 
 func genBatchType(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P()
 	g.P("type ", d.BatchName(), " struct {")
+	g.P("parent string")
 	g.P("keys []string")
 	g.P("data []", d.OutputType())
 	g.P("err error")
@@ -97,30 +97,26 @@ func genConstructor(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("func New", d.Name(), "(")
 	g.P("ctx ", contextContext, ",")
 	g.P("client ", d.ClientName(), ",")
-	g.P("requestTemplate *", d.Method.Input.GoIdent, ",")
 	g.P("wait ", timeDuration, ",")
 	g.P("maxBatch int,")
 	g.P(") *", d.Name(), " {")
 	g.P("return &", d.Name(), "{")
 	g.P("ctx: ctx,")
 	g.P("client: client,")
-	g.P("requestTemplate: requestTemplate,")
 	g.P("wait: wait,")
 	g.P("maxBatch: maxBatch,")
+	g.P("batches: make(map[string]*", d.BatchName(), "),")
 	g.P("}")
 	g.P("}")
 }
 
 func genFetchFn(g *protogen.GeneratedFile, d *Dataloader) {
-	protoClone := g.QualifiedGoIdent(protogen.GoIdent{
-		GoImportPath: "google.golang.org/protobuf/proto",
-		GoName:       "Clone",
-	})
 	g.P()
-	g.P("func (l *", d.Name(), ") fetch(keys []string) ([]", d.OutputType(), ", error) {")
-	g.P("request := ", protoClone, "(l.requestTemplate).(*", d.Method.Input.GoIdent, ")")
-	g.P("request.", d.InputField.GoName, " = keys")
-	g.P("response, err := l.client.", d.Method.GoName, "(l.ctx, request)")
+	g.P("func (l *", d.Name(), ") fetch(parent string, names []string) ([]", d.OutputType(), ", error) {")
+	g.P("var request ", d.Method.Input.GoIdent)
+	g.P("request.", d.ParentField.GoName, " = parent")
+	g.P("request.", d.NameField.GoName, " = names")
+	g.P("response, err := l.client.", d.Method.GoName, "(l.ctx, &request)")
 	g.P("if err != nil {")
 	g.P("return nil, err")
 	g.P("}")
@@ -131,7 +127,7 @@ func genFetchFn(g *protogen.GeneratedFile, d *Dataloader) {
 func genLoadMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P()
 	g.P("// Load a result by key, batching and caching will be applied automatically")
-	g.P("func (l *", d.Name(), ") Load(key string) (", d.OutputType(), ", error) {")
+	g.P("func (l *", d.Name(), ") Load(parent string, name string) (", d.OutputType(), ", error) {")
 	fmtErrorf := g.QualifiedGoIdent(protogen.GoIdent{
 		GoImportPath: "fmt",
 		GoName:       "Errorf",
@@ -139,7 +135,7 @@ func genLoadMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("if l == nil {")
 	g.P("return ", d.OutputZero(), ", ", fmtErrorf, `("`, d.Name(), ` is nil")`)
 	g.P("}")
-	g.P("return l.LoadThunk(key)()")
+	g.P("return l.LoadThunk(parent, name)()")
 	g.P("}")
 }
 
@@ -148,7 +144,7 @@ func genLoadThunkMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("// LoadThunk returns a function that when called will block waiting for a result.")
 	g.P("// This method should be used if you want one goroutine to make requests to many")
 	g.P("// different data loaders without blocking until the thunk is called.")
-	g.P("func (l *", d.Name(), ") LoadThunk(key string) func() (", d.OutputType(), ", error) {")
+	g.P("func (l *", d.Name(), ") LoadThunk(parent string, name string) func() (", d.OutputType(), ", error) {")
 	fmtErrorf := g.QualifiedGoIdent(protogen.GoIdent{
 		GoImportPath: "fmt",
 		GoName:       "Errorf",
@@ -159,17 +155,18 @@ func genLoadThunkMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("}")
 	g.P("}")
 	g.P("l.mu.Lock()")
-	g.P("if it, ok := l.cache[key]; ok {")
+	g.P("if it, ok := l.cache[name]; ok {")
 	g.P("l.mu.Unlock()")
 	g.P("return func() (", d.OutputType(), ", error) {")
 	g.P("return it, nil")
 	g.P("}")
 	g.P("}")
-	g.P("if l.batch == nil {")
-	g.P("l.batch = &", d.BatchName(), "{done: make(chan struct{})}")
+	g.P("batch, ok := l.batches[parent]")
+	g.P("if !ok {")
+	g.P("batch = &", d.BatchName(), "{parent: parent, done: make(chan struct{})}")
+	g.P("l.batches[parent] = batch ")
 	g.P("}")
-	g.P("batch := l.batch")
-	g.P("pos := batch.keyIndex(l, key)")
+	g.P("pos := batch.keyIndex(l, name)")
 	g.P("l.mu.Unlock()")
 	g.P("return func() (", d.OutputType(), ", error) {")
 	g.P("<-batch.done")
@@ -179,7 +176,7 @@ func genLoadThunkMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("}")
 	g.P("if batch.err == nil {")
 	g.P("l.mu.Lock()")
-	g.P("l.unsafeSet(key, data)")
+	g.P("l.unsafeSet(name, data)")
 	g.P("l.mu.Unlock()")
 	g.P("}")
 	g.P("return data, batch.err")
@@ -191,12 +188,12 @@ func genLoadAllMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P()
 	g.P("// LoadAll fetches many keys at once.")
 	g.P("// It will be broken into appropirately sized sub-batches based on how the dataloader is configured.")
-	g.P("func (l *", d.Name(), ") LoadAll(keys []string) ([]", d.OutputType(), ", error) {")
-	g.P("results := make([]func() (", d.OutputType(), ", error), len(keys))")
-	g.P("for i, key := range keys {")
-	g.P("results[i] = l.LoadThunk(key)")
+	g.P("func (l *", d.Name(), ") LoadAll(parent string, names []string) ([]", d.OutputType(), ", error) {")
+	g.P("results := make([]func() (", d.OutputType(), ", error), len(names))")
+	g.P("for i, name := range names {")
+	g.P("results[i] = l.LoadThunk(parent, name)")
 	g.P("}")
-	g.P("values := make([]", d.OutputType(), ", len(keys))")
+	g.P("values := make([]", d.OutputType(), ", len(names))")
 	g.P("var err error")
 	g.P("for i, thunk := range results {")
 	g.P("values[i], err = thunk()")
@@ -213,13 +210,13 @@ func genLoadAllThunkMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("// LoadAllThunk returns a function that when called will block waiting for results.")
 	g.P("// This method should be used if you want one goroutine to make requests to many")
 	g.P("// different data loaders without blocking until the thunk is called.")
-	g.P("func (l *", d.Name(), ") LoadAllThunk(keys []string) (func() ([]", d.OutputType(), ", error)) {")
-	g.P("results := make([]func() (", d.OutputType(), ", error), len(keys))")
-	g.P("for i, key := range keys {")
-	g.P("results[i] = l.LoadThunk(key)")
+	g.P("func (l *", d.Name(), ") LoadAllThunk(parent string, names []string) (func() ([]", d.OutputType(), ", error)) {")
+	g.P("results := make([]func() (", d.OutputType(), ", error), len(names))")
+	g.P("for i, name := range names {")
+	g.P("results[i] = l.LoadThunk(parent, name)")
 	g.P("}")
 	g.P("return func() ([]", d.OutputType(), ", error) {")
-	g.P("values := make([]", d.OutputType(), ", len(keys))")
+	g.P("values := make([]", d.OutputType(), ", len(names))")
 	g.P("var err error")
 	g.P("for i, thunk := range results {")
 	g.P("values[i], err = thunk()")
@@ -303,7 +300,7 @@ func genKeyIndexMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("if l.maxBatch != 0 && pos >= l.maxBatch-1 {")
 	g.P("if !b.closing {")
 	g.P("b.closing = true")
-	g.P("l.batch = nil")
+	g.P("delete(l.batches, b.parent)")
 	g.P("go b.end(l)")
 	g.P("}")
 	g.P("}")
@@ -321,7 +318,7 @@ func genStartTimerMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P("l.mu.Unlock()")
 	g.P("return")
 	g.P("}")
-	g.P("l.batch = nil")
+	g.P("delete(l.batches, b.parent)")
 	g.P("l.mu.Unlock()")
 	g.P("b.end(l)")
 	g.P("}")
@@ -330,7 +327,7 @@ func genStartTimerMethod(g *protogen.GeneratedFile, d *Dataloader) {
 func genEndMethod(g *protogen.GeneratedFile, d *Dataloader) {
 	g.P()
 	g.P("func (b *", d.BatchName(), ") end(l *", d.Name(), ") {")
-	g.P("b.data, b.err = l.fetch(b.keys)")
+	g.P("b.data, b.err = l.fetch(b.parent, b.keys)")
 	g.P("close(b.done)")
 	g.P("}")
 }
@@ -339,8 +336,9 @@ type Dataloader struct {
 	Method  *protogen.Method
 	Service *protogen.Service
 	// TODO: Parent field support.
-	InputField  *protogen.Field
+	NameField   *protogen.Field
 	OutputField *protogen.Field
+	ParentField *protogen.Field
 }
 
 func (d *Dataloader) OutputType() string {
@@ -379,10 +377,28 @@ func getDataloadersFromFile(file *protogen.File) []*Dataloader {
 	var result []*Dataloader
 	for _, service := range file.Services {
 		for _, method := range service.Methods {
-			if !strings.HasPrefix(string(method.Desc.Name()), "Batch") {
+			if !strings.HasPrefix(string(method.Desc.Name()), "BatchGet") {
 				continue
 			}
-			var inputField *protogen.Field
+
+			var parentField *protogen.Field
+			for _, field := range method.Input.Fields {
+				if field.Desc.IsList() {
+					continue
+				}
+				if field.Desc.Kind() != protoreflect.StringKind {
+					continue
+				}
+				if field.Desc.Name() != "parent" {
+					continue
+				}
+				parentField = field
+				break
+			}
+			if parentField == nil {
+				continue
+			}
+			var nameField *protogen.Field
 			for _, field := range method.Input.Fields {
 				if !field.Desc.IsList() {
 					continue
@@ -390,10 +406,13 @@ func getDataloadersFromFile(file *protogen.File) []*Dataloader {
 				if field.Desc.Kind() != protoreflect.StringKind {
 					continue
 				}
-				inputField = field
+				if field.Desc.Name() != "names" {
+					continue
+				}
+				nameField = field
 				break
 			}
-			if inputField == nil {
+			if nameField == nil {
 				continue
 			}
 			var outputField *protogen.Field
@@ -415,7 +434,9 @@ func getDataloadersFromFile(file *protogen.File) []*Dataloader {
 			result = append(result, &Dataloader{
 				Method:      method,
 				Service:     service,
-				InputField:  inputField,
+				ParentField: parentField,
+
+				NameField:   nameField,
 				OutputField: outputField,
 			})
 		}

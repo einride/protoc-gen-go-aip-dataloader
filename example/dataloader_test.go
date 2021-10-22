@@ -32,7 +32,7 @@ func TestDataloader(t *testing.T) {
 						site1,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -60,7 +60,7 @@ func TestDataloader(t *testing.T) {
 				t.Parallel()
 				ctx := context.Background()
 				client := &mockSiteService{}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -93,7 +93,7 @@ func TestDataloader(t *testing.T) {
 						site1,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -130,7 +130,7 @@ func TestDataloader(t *testing.T) {
 						site1,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -180,7 +180,7 @@ func TestDataloader(t *testing.T) {
 				}
 				const timeoutLimit = time.Millisecond * 100
 				const batchLimit = 1
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					timeoutLimit,
@@ -222,7 +222,7 @@ func TestDataloader(t *testing.T) {
 				client := &mockSiteService{
 					sites: sites,
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -276,7 +276,7 @@ func TestDataloader(t *testing.T) {
 						site1,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -330,7 +330,7 @@ func TestDataloader(t *testing.T) {
 					sites: sites,
 				}
 				const timeoutLimit = time.Millisecond * 10
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					timeoutLimit,
@@ -395,7 +395,7 @@ func TestDataloader(t *testing.T) {
 						site1, site2,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -438,7 +438,7 @@ func TestDataloader(t *testing.T) {
 						site1, site2,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -507,7 +507,7 @@ func TestDataloader(t *testing.T) {
 						site1, site2, site3, site4,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -596,7 +596,7 @@ func TestDataloader(t *testing.T) {
 						site1, site3,
 					},
 				}
-				dl := NewSitesDataloader(
+				dl := freightv1.NewSitesDataloader(
 					ctx,
 					client,
 					time.Millisecond*100,
@@ -671,7 +671,7 @@ func TestDataloader(t *testing.T) {
 			client := &mockSiteService{
 				sites: sites,
 			}
-			dl := NewSitesDataloader(
+			dl := freightv1.NewSitesDataloader(
 				ctx,
 				client,
 				time.Millisecond*100,
@@ -708,7 +708,7 @@ func TestDataloader(t *testing.T) {
 					site2,
 				},
 			}
-			dl := NewSitesDataloader(
+			dl := freightv1.NewSitesDataloader(
 				ctx,
 				client,
 				time.Millisecond*100,
@@ -744,7 +744,7 @@ func TestDataloader(t *testing.T) {
 			}
 			const timeoutLimit = time.Millisecond * 100
 			const batchLimit = 1
-			dl := NewSitesDataloader(
+			dl := freightv1.NewSitesDataloader(
 				ctx,
 				client,
 				timeoutLimit,
@@ -795,7 +795,7 @@ func TestDataloader(t *testing.T) {
 				sites: []*freightv1.Site{site1, site2, site3},
 			}
 			const timeoutLimit = time.Millisecond * 10
-			dl := NewSitesDataloader(
+			dl := freightv1.NewSitesDataloader(
 				ctx,
 				client,
 				timeoutLimit,
@@ -901,6 +901,7 @@ func (m *mockSiteService) BatchGetSites(
 		Sites: sites,
 	}, nil
 }
+
 func makeDeterministic(reqs []*freightv1.BatchGetSitesRequest) []*freightv1.BatchGetSitesRequest {
 	sort.SliceStable(reqs, func(i, j int) bool {
 		return reqs[i].Parent < reqs[j].Parent
