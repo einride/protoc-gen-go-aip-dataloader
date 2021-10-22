@@ -12,14 +12,13 @@ import (
 
 // SitesDataloader is a dataloader for einride.example.freight.v1.FreightService.BatchGetSites.
 type SitesDataloader struct {
-	ctx             context.Context
-	client          freightv1.FreightServiceClient
-	requestTemplate *freightv1.BatchGetSitesRequest
-	wait            time.Duration
-	maxBatch        int
-	mu              sync.Mutex // protects mutable state below
-	cache           map[string]*freightv1.Site
-	batch           *sitesDataloaderBatch
+	ctx      context.Context
+	client   freightv1.FreightServiceClient
+	wait     time.Duration
+	maxBatch int
+	mu       sync.Mutex // protects mutable state below
+	cache    map[string]*freightv1.Site
+	batch    *sitesDataloaderBatch
 }
 
 type sitesDataloaderBatch struct {
@@ -34,23 +33,22 @@ type sitesDataloaderBatch struct {
 func NewSitesDataloader(
 	ctx context.Context,
 	client freightv1.FreightServiceClient,
-	requestTemplate *freightv1.BatchGetSitesRequest,
 	wait time.Duration,
 	maxBatch int,
 ) *SitesDataloader {
 	return &SitesDataloader{
-		ctx:             ctx,
-		client:          client,
-		requestTemplate: requestTemplate,
-		wait:            wait,
-		maxBatch:        maxBatch,
+		ctx:      ctx,
+		client:   client,
+		wait:     wait,
+		maxBatch: maxBatch,
 	}
 }
 
 func (l *SitesDataloader) fetch(keys []string) ([]*freightv1.Site, error) {
-	request := proto.Clone(l.requestTemplate).(*freightv1.BatchGetSitesRequest)
+	var request freightv1.BatchGetSitesRequest
+	// request := proto.Clone(l.requestTemplate).(*freightv1.BatchGetSitesRequest)
 	request.Names = keys
-	response, err := l.client.BatchGetSites(l.ctx, request)
+	response, err := l.client.BatchGetSites(l.ctx, &request)
 	if err != nil {
 		return nil, err
 	}
@@ -58,23 +56,24 @@ func (l *SitesDataloader) fetch(keys []string) ([]*freightv1.Site, error) {
 }
 
 // Load a result by key, batching and caching will be applied automatically
-func (l *SitesDataloader) Load(key string) (*freightv1.Site, error) {
+func (l *SitesDataloader) Load(parent string, name string) (*freightv1.Site, error) {
 	if l == nil {
 		return nil, fmt.Errorf("SitesDataloader is nil")
 	}
-	return l.LoadThunk(key)()
+	return l.LoadThunk(parent, name)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a result.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *SitesDataloader) LoadThunk(key string) func() (*freightv1.Site, error) {
+func (l *SitesDataloader) LoadThunk(parent string, name string) func() (*freightv1.Site, error) {
 	if l == nil {
 		return func() (*freightv1.Site, error) {
 			return nil, fmt.Errorf("SitesDataloader is nil")
 		}
 	}
 	l.mu.Lock()
+	key := name
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() (*freightv1.Site, error) {
@@ -104,10 +103,11 @@ func (l *SitesDataloader) LoadThunk(key string) func() (*freightv1.Site, error) 
 
 // LoadAll fetches many keys at once.
 // It will be broken into appropirately sized sub-batches based on how the dataloader is configured.
-func (l *SitesDataloader) LoadAll(keys []string) ([]*freightv1.Site, error) {
+func (l *SitesDataloader) LoadAll(parent string, names []string) ([]*freightv1.Site, error) {
+	keys := names
 	results := make([]func() (*freightv1.Site, error), len(keys))
 	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
+		results[i] = l.LoadThunk(parent, key)
 	}
 	values := make([]*freightv1.Site, len(keys))
 	var err error
@@ -123,10 +123,11 @@ func (l *SitesDataloader) LoadAll(keys []string) ([]*freightv1.Site, error) {
 // LoadAllThunk returns a function that when called will block waiting for results.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *SitesDataloader) LoadAllThunk(keys []string) func() ([]*freightv1.Site, error) {
+func (l *SitesDataloader) LoadAllThunk(parent string, names []string) func() ([]*freightv1.Site, error) {
+	keys := names
 	results := make([]func() (*freightv1.Site, error), len(keys))
 	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
+		results[i] = l.LoadThunk(parent, key)
 	}
 	return func() ([]*freightv1.Site, error) {
 		values := make([]*freightv1.Site, len(keys))

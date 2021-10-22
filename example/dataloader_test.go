@@ -34,14 +34,11 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				100,
 			)
 
-			gotSite, err := dl.Load(site1.Name)
+			gotSite, err := dl.Load("shippers/1", site1.Name)
 			assert.NilError(t, err)
 
 			// should receive correct site
@@ -65,15 +62,12 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				100,
 			)
 
 			// try to load missing site
-			gotSite, err := dl.Load("shippers/1/site/999")
+			gotSite, err := dl.Load("shippers/1", "shippers/1/site/999")
 			assert.Assert(t, cmp.Nil(gotSite))
 			assert.Equal(t, status.Code(err), codes.NotFound)
 
@@ -101,17 +95,14 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				100,
 			)
 
 			// load the same key twice (one by one)
-			gotSite1, err := dl.Load(site1.Name)
+			gotSite1, err := dl.Load("shippers/1", site1.Name)
 			assert.NilError(t, err)
-			gotSite2, err := dl.Load(site1.Name)
+			gotSite2, err := dl.Load("shippers/1", site1.Name)
 			assert.NilError(t, err)
 
 			// should receive correct site (twice)
@@ -141,19 +132,16 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				100,
 			)
 
 			// try to load missing key
-			gotSite1, err := dl.Load("shippers/1/sites/999")
+			gotSite1, err := dl.Load("shippers/1", "shippers/1/sites/999")
 			assert.Assert(t, cmp.Nil(gotSite1))
 			assert.Equal(t, status.Code(err), codes.NotFound)
 			// load existing key
-			gotSite2, err := dl.Load(site1.Name)
+			gotSite2, err := dl.Load("shippers/1", site1.Name)
 			assert.NilError(t, err)
 
 			// should receive correct site
@@ -194,9 +182,6 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				timeoutLimit,
 				batchLimit,
 			)
@@ -204,7 +189,7 @@ func TestDataloader(t *testing.T) {
 			// Start timer
 			t1 := time.Now()
 			// load each key
-			gotSite1, err := dl.Load(site1.Name)
+			gotSite1, err := dl.Load("shippers/1", site1.Name)
 			// Stop timer
 			t2 := time.Now()
 			assert.NilError(t, err)
@@ -239,9 +224,6 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				200,
 			)
@@ -255,7 +237,7 @@ func TestDataloader(t *testing.T) {
 			for i := 0; i < n; i++ {
 				i := i
 				g.Go(func() error {
-					site, err := dl.Load(sites[i].Name)
+					site, err := dl.Load("shippers/1", sites[i].Name)
 					if err != nil {
 						return err
 					}
@@ -296,9 +278,6 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				100,
 			)
@@ -308,7 +287,7 @@ func TestDataloader(t *testing.T) {
 			var gotSite2 *freightv1.Site
 			var g errgroup.Group
 			g.Go(func() error {
-				site, err := dl.Load(site1.Name)
+				site, err := dl.Load("shippers/1", site1.Name)
 				if err != nil {
 					return err
 				}
@@ -316,7 +295,7 @@ func TestDataloader(t *testing.T) {
 				return nil
 			})
 			g.Go(func() error {
-				site, err := dl.Load(site1.Name)
+				site, err := dl.Load("shippers/1", site1.Name)
 				if err != nil {
 					return err
 				}
@@ -353,9 +332,6 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				timeoutLimit,
 				100,
 			)
@@ -365,7 +341,7 @@ func TestDataloader(t *testing.T) {
 			var gotSite2 *freightv1.Site
 			var g errgroup.Group
 			g.Go(func() error {
-				site, err := dl.Load(site1.Name)
+				site, err := dl.Load("shippers/1", site1.Name)
 				if err != nil {
 					return err
 				}
@@ -375,7 +351,7 @@ func TestDataloader(t *testing.T) {
 			g.Go(func() error {
 				// Sleep to trigger a timeout in the dataloader
 				time.Sleep(2 * timeoutLimit)
-				site, err := dl.Load(site2.Name)
+				site, err := dl.Load("shippers/1", site2.Name)
 				if err != nil {
 					return err
 				}
@@ -426,15 +402,12 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				100,
 			)
 
 			// load all keys
-			gotSites, err := dl.LoadAll([]string{site1.Name, site2.Name})
+			gotSites, err := dl.LoadAll("shippers/1", []string{site1.Name, site2.Name})
 			assert.NilError(t, err)
 
 			// should receive correct site (twice)
@@ -466,15 +439,12 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				time.Millisecond*100,
 				100,
 			)
 
 			// load all keys
-			gotSites, err := dl.LoadAll([]string{site1.Name, "shippers/1/site/999", site2.Name})
+			gotSites, err := dl.LoadAll("shippers/1", []string{site1.Name, "shippers/1/site/999", site2.Name})
 			assert.Assert(t, cmp.Nil(gotSites))
 			assert.Equal(t, status.Code(err), codes.NotFound)
 
@@ -505,9 +475,6 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				timeoutLimit,
 				batchLimit,
 			)
@@ -515,7 +482,7 @@ func TestDataloader(t *testing.T) {
 			// start timer
 			t1 := time.Now()
 			// load all keys
-			gotSites, err := dl.LoadAll([]string{site1.Name, site2.Name})
+			gotSites, err := dl.LoadAll("shippers/1", []string{site1.Name, site2.Name})
 			// stop timer
 			t2 := time.Now()
 			assert.NilError(t, err)
@@ -559,9 +526,6 @@ func TestDataloader(t *testing.T) {
 			dl := NewSitesDataloader(
 				ctx,
 				client,
-				&freightv1.BatchGetSitesRequest{
-					Parent: "shippers/1",
-				},
 				timeoutLimit,
 				100,
 			)
@@ -571,7 +535,7 @@ func TestDataloader(t *testing.T) {
 			var gotSites2 []*freightv1.Site
 			var g errgroup.Group
 			g.Go(func() error {
-				sites, err := dl.LoadAll([]string{site1.Name, site2.Name})
+				sites, err := dl.LoadAll("shippers/1", []string{site1.Name, site2.Name})
 				if err != nil {
 					return err
 				}
@@ -581,7 +545,7 @@ func TestDataloader(t *testing.T) {
 			g.Go(func() error {
 				// Sleep to trigger a timeout in the dataloader
 				time.Sleep(timeoutLimit + (time.Millisecond * 5))
-				sites, err := dl.LoadAll([]string{site3.Name})
+				sites, err := dl.LoadAll("shippers/1", []string{site3.Name})
 				if err != nil {
 					return err
 				}
