@@ -31,7 +31,7 @@ func TestDataloader(t *testing.T) {
 					site1,
 				},
 			}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -62,7 +62,7 @@ func TestDataloader(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			client := &mockSiteService{}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -98,7 +98,7 @@ func TestDataloader(t *testing.T) {
 					site1,
 				},
 			}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -138,7 +138,7 @@ func TestDataloader(t *testing.T) {
 					site1,
 				},
 			}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -191,7 +191,7 @@ func TestDataloader(t *testing.T) {
 			}
 			const timeoutLimit = time.Millisecond * 100
 			const batchLimit = 1
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -236,7 +236,7 @@ func TestDataloader(t *testing.T) {
 			client := &mockSiteService{
 				sites: sites,
 			}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -293,7 +293,7 @@ func TestDataloader(t *testing.T) {
 					site1,
 				},
 			}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -350,7 +350,7 @@ func TestDataloader(t *testing.T) {
 				sites: sites,
 			}
 			const timeoutLimit = time.Millisecond * 10
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -423,7 +423,7 @@ func TestDataloader(t *testing.T) {
 			client := &mockSiteService{
 				sites: sites,
 			}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -463,7 +463,7 @@ func TestDataloader(t *testing.T) {
 					site2,
 				},
 			}
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -502,7 +502,7 @@ func TestDataloader(t *testing.T) {
 			}
 			const timeoutLimit = time.Millisecond * 100
 			const batchLimit = 1
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
@@ -556,7 +556,7 @@ func TestDataloader(t *testing.T) {
 				sites: []*freightv1.Site{site1, site2, site3},
 			}
 			const timeoutLimit = time.Millisecond * 10
-			dl := freightv1.NewSitesDataloader(
+			dl := NewSitesDataloader(
 				ctx,
 				client,
 				&freightv1.BatchGetSitesRequest{
