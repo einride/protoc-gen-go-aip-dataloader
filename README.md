@@ -1,17 +1,12 @@
-# protoc-gen-go-aip-dataloader
+protoc-gen-go-aip-dataloader
+============================
 
-Generate [GraphQL][graphql] Go [dataloaders][dataloader] for [AIP][aip]
-[BatchGet][batch-get] methods.
+Generate [GraphQL](https://graphql.org) Go [dataloaders](https://github.com/graphql/dataloader) for [AIP](https://google.aip.dev) [BatchGet](https://google.aip.dev/231) methods.
 
-Heavily inspired by [vektah/dataloaden][dataloaden].
+Heavily inspired by [vektah/dataloaden](https://github.com/vektah/dataloaden).
 
-[graphql]: https://graphql.org
-[dataloader]: https://github.com/graphql/dataloader
-[aip]: https://google.aip.dev
-[batch-get]: https://google.aip.dev/231
-[dataloaden]: https://github.com/vektah/dataloaden
-
-## How to
+How to
+------
 
 ### Step 1: Declare a Batch method in your API
 
@@ -33,10 +28,7 @@ $ GOBIN=$PWD/build go install go.einride.tech/protoc-gen-go-aip-dataloader
 
 ### Step 3: Configure code generation
 
-The following example uses a [buf generate][buf-generate] template to
-configure the CLI generator.
-
-[buf-generate]: https://docs.buf.build/generate/usage
+The following example uses a [buf generate](https://docs.buf.build/generate/usage) template to configure the CLI generator.
 
 [buf.gen.example.yaml](./proto/buf.gen.example.yaml):
 

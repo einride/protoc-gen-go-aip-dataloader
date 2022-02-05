@@ -20,6 +20,7 @@ import (
 )
 
 func TestDataloader(t *testing.T) {
+	t.Parallel()
 	t.Run("Load", func(t *testing.T) {
 		t.Parallel()
 		t.Run("SingleKey", func(t *testing.T) {
@@ -264,7 +265,6 @@ func TestDataloader(t *testing.T) {
 					gotSites = append(gotSites, site)
 					return nil
 				})
-
 			}
 			assert.NilError(t, g.Wait())
 
@@ -542,7 +542,13 @@ func TestDataloader(t *testing.T) {
 				},
 			}
 			// order is not guaranteed because combination of LoadAll() and end() happens async
-			assert.DeepEqual(t, expectedRequest, client.recvRequests, protocmp.Transform(), cmpopts.SortSlices(batchGetSitesRequestsLessFunc))
+			assert.DeepEqual(
+				t,
+				expectedRequest,
+				client.recvRequests,
+				protocmp.Transform(),
+				cmpopts.SortSlices(batchGetSitesRequestsLessFunc),
+			)
 		})
 		t.Run("AboveTimeoutLimitConcurrently", func(t *testing.T) {
 			t.Parallel()
